@@ -7,7 +7,7 @@ from routes.query import query_bp
 app = Flask(__name__)
 
 # ✅ Enable CORS before registering blueprints
-CORS(app)  # This applies CORS to all routes
+CORS(app, supports_credentials=True)
 
 # ✅ Configure Database URI (update if needed)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///intelli_claim.db'
