@@ -1,6 +1,6 @@
 from flask import Blueprint, request, jsonify
 from services.extractor import extract_text_from_pdf
-from models.document_model import insert_document
+from models.document_model import insert_document, get_document_by_id, serialize_document
 
 upload_bp = Blueprint('upload', __name__)
 
@@ -15,22 +15,21 @@ def upload_file():
         return jsonify({"error": "No selected file"}), 400
 
     if file:
-        file_content = file.read()  # Read once
-        file.seek(0)  # Reset file pointer just in case
-        extracted_text, metadata = extract_text_from_pdf(file)  # Unpack both text & metadata
+        file_content = file.read()  # Read file contents
+        file.seek(0)  # Reset pointer
+        extracted_text, metadata = extract_text_from_pdf(file)  # Text + metadata
 
-        # Insert into DB
+        # Insert into database
         doc_id = insert_document(
             name=file.filename,
             file_type=file.content_type,
-            size=len(file_content),  # Use the actual content length
+            size=len(file_content),
             extracted_text=extracted_text,
             metadata=metadata
         )
 
-        return jsonify({
-            "message": "File uploaded and processed successfully",
-            "document_id": doc_id
-        }), 200
+        # Fetch and serialize full document
+        doc = get_document_by_id(doc_id)
+        return jsonify(serialize_document(doc)), 200
 
     return jsonify({"error": "Something went wrong"}), 500
