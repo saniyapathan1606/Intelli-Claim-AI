@@ -20,8 +20,9 @@ export function DecisionHistory({ decisions }: DecisionHistoryProps) {
 
   const filteredDecisions = decisions.filter((decision) => {
     const matchesSearch =
-      decision.query.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      decision.justification.toLowerCase().includes(searchTerm.toLowerCase())
+  (typeof decision.query === "string" && decision.query.toLowerCase().includes(searchTerm.toLowerCase())) ||
+  (typeof decision.justification === "string" && decision.justification.toLowerCase().includes(searchTerm.toLowerCase()))
+
     const matchesFilter = filterStatus === "all" || decision.decision === filterStatus
     return matchesSearch && matchesFilter
   })

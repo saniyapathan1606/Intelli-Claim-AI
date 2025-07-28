@@ -72,11 +72,12 @@ export function QueryProcessor({ uploadedDocs, onDecisionMade }: QueryProcessorP
     setProcessingStep("Sending query to Gemini for processing...")
 
     try {
-      const res = await fetch("/api/process-query", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ query, documents: uploadedDocs }),
-      })
+       const res = await fetch("http://localhost:5000/api/query", {
+       method: "POST",
+       headers: { "Content-Type": "application/json" },
+       body: JSON.stringify({ query }),
+     });
+
 
       if (!res.ok) throw new Error("Query processing failed")
 
@@ -86,7 +87,9 @@ export function QueryProcessor({ uploadedDocs, onDecisionMade }: QueryProcessorP
 
       toast({
         title: "Query processed successfully",
-        description: `Decision: ${resultData.decision?.decision?.toUpperCase?.() || "Unknown"}`,
+        description:resultData.decision
+    ? `Decision: ${resultData.decision?.decision?.toUpperCase()}`
+    : "Received a response but no decision data",
       })
     } catch (error) {
       console.error("Error:", error)
