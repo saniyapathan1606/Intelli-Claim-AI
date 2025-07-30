@@ -18,53 +18,53 @@ export function DocumentUpload({ onDocsUploaded, uploadedDocs }: DocumentUploadP
   const [uploadProgress, setUploadProgress] = useState(0)
   const { toast } = useToast()
 
-const handleFileUpload = useCallback(
-  async (files: FileList) => {
-    setUploading(true)
-    setUploadProgress(0)
-
-    try {
-      const newDocs = []
-
-      for (let i = 0; i < files.length; i++) {
-        const file = files[i]
-        setUploadProgress((i / files.length) * 100)
-
-        const formData = new FormData()
-        formData.append("file", file)
-
-        const res = await fetch("http://localhost:5000/api/upload", {
-          method: "POST",
-          body: formData,
-        })
-
-        if (!res.ok) throw new Error("Upload failed")
-
-        const doc = await res.json()
-        newDocs.push(doc)
-      }
-
-      setUploadProgress(100)
-      onDocsUploaded([...uploadedDocs, ...newDocs])
-
-      toast({
-        title: "Documents uploaded successfully",
-        description: `${files.length} document(s) processed and stored.`,
-      })
-    } catch (error) {
-      console.error("Upload error:", error)
-      toast({
-        title: "Upload failed",
-        description: "There was an error uploading the document.",
-        variant: "destructive",
-      })
-    } finally {
-      setUploading(false)
+  const handleFileUpload = useCallback(
+    async (files: FileList) => {
+      setUploading(true)
       setUploadProgress(0)
-    }
-  },
-  [uploadedDocs, onDocsUploaded, toast]
-)
+
+      try {
+        const newDocs = []
+
+        for (let i = 0; i < files.length; i++) {
+          const file = files[i]
+          setUploadProgress((i / files.length) * 100)
+
+          const formData = new FormData()
+          formData.append("file", file)
+
+          const res = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/upload`, {
+            method: "POST",
+            body: formData,
+          })
+
+          if (!res.ok) throw new Error("Upload failed")
+
+          const doc = await res.json()
+          newDocs.push(doc)
+        }
+
+        setUploadProgress(100)
+        onDocsUploaded([...uploadedDocs, ...newDocs])
+
+        toast({
+          title: "Documents uploaded successfully",
+          description: `${files.length} document(s) processed and stored.`,
+        })
+      } catch (error) {
+        console.error("Upload error:", error)
+        toast({
+          title: "Upload failed",
+          description: "There was an error uploading the document.",
+          variant: "destructive",
+        })
+      } finally {
+        setUploading(false)
+        setUploadProgress(0)
+      }
+    },
+    [uploadedDocs, onDocsUploaded, toast]
+  )
 
   const removeDocument = (docId: number) => {
     onDocsUploaded(uploadedDocs.filter((doc) => doc.id !== docId))

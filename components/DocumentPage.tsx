@@ -4,15 +4,16 @@ import { useEffect, useState } from "react"
 import { DocumentViewer } from "@/components/document-viewer"
 
 export default function DocumentPage() {
-  const [docs, setDocs] = useState<any[]>([])      // to store list of documents
-  const [loading, setLoading] = useState(true)     // to show loading spinner
+  const [docs, setDocs] = useState<any[]>([])       // List of documents
+  const [loading, setLoading] = useState(true)      // Loading state
 
   useEffect(() => {
     const fetchDocs = async () => {
       try {
-        const res = await fetch("http://localhost:5000/documents") // 👈 fetch from Flask
+        const res = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/documents`)
+        if (!res.ok) throw new Error("Failed to fetch documents")
         const data = await res.json()
-        setDocs(data)    // set the documents
+        setDocs(data)
       } catch (error) {
         console.error("Failed to fetch documents", error)
       } finally {
@@ -25,5 +26,5 @@ export default function DocumentPage() {
 
   if (loading) return <div className="p-6">📄 Loading documents...</div>
 
-  return <DocumentViewer uploadedDocs={docs} />  // ✅ pass fetched data here
+  return <DocumentViewer uploadedDocs={docs} />
 }

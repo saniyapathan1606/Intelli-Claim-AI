@@ -27,6 +27,36 @@ import {
 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 
+interface Clause {
+  clauseId: string
+  document: string
+  page: number
+  relevanceScore: number
+  text: string
+}
+
+interface Decision {
+  decision: string
+  confidence: number
+  amount?: number
+  justification?: string
+}
+
+interface ExtractedInfo {
+  age?: string
+  gender?: string
+  procedure?: string
+  location?: string
+  policyAge?: string
+}
+
+interface QueryResult {
+  decision?: Decision
+  extractedInfo?: ExtractedInfo
+  relevantClauses?: Clause[] | string
+  timestamp: string
+}
+
 interface QueryProcessorProps {
   uploadedDocs: any[]
   onDecisionMade: (decision: any) => void
@@ -35,17 +65,10 @@ interface QueryProcessorProps {
 export function QueryProcessor({ uploadedDocs, onDecisionMade }: QueryProcessorProps) {
   const [query, setQuery] = useState("")
   const [processing, setProcessing] = useState(false)
-  const [result, setResult] = useState<any>(null)
+  const [result, setResult] = useState<QueryResult | null>(null)
   const [processingStep, setProcessingStep] = useState("")
   const [progress, setProgress] = useState(0)
   const { toast } = useToast()
-
-  const sampleQueries = [
-    "46-year-old male, knee surgery in Pune, 3-month-old insurance policy",
-    "Female, 35 years, cardiac procedure, Mumbai, policy active for 2 years",
-    "Dental treatment for 28-year-old, Delhi, new policy purchased last month",
-    "Emergency surgery, 52-year-old male, Bangalore, premium policy holder",
-  ]
 
   const processQuery = async () => {
     if (!query.trim()) {
@@ -69,15 +92,14 @@ export function QueryProcessor({ uploadedDocs, onDecisionMade }: QueryProcessorP
     setProcessing(true)
     setProgress(20)
     setResult(null)
-    setProcessingStep("Sending query to Gemini for processing...")
+    setProcessingStep("Sending query to server for processing...")
 
     try {
-       const res = await fetch("http://localhost:5000/api/query", {
-       method: "POST",
-       headers: { "Content-Type": "application/json" },
-       body: JSON.stringify({ query }),
-     });
-
+      const res = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/query`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query }),
+      })
 
       if (!res.ok) throw new Error("Query processing failed")
 
@@ -87,9 +109,9 @@ export function QueryProcessor({ uploadedDocs, onDecisionMade }: QueryProcessorP
 
       toast({
         title: "Query processed successfully",
-        description:resultData.decision
-    ? `Decision: ${resultData.decision?.decision?.toUpperCase()}`
-    : "Received a response but no decision data",
+        description: resultData.decision
+          ? `Decision: ${resultData.decision.decision?.toUpperCase()}`
+          : "Received a response but no decision data",
       })
     } catch (error) {
       console.error("Error:", error)
@@ -170,21 +192,22 @@ export function QueryProcessor({ uploadedDocs, onDecisionMade }: QueryProcessorP
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              {getDecisionIcon(result.decision?.decision)} Decision Result
+              {getDecisionIcon(result.decision?.decision ?? "")} Decision Result
             </CardTitle>
             <CardDescription>
-              Confidence: {(result.decision?.confidence * 100).toFixed(1)}%
+              Confidence: {(result.decision?.confidence ?? 0) * 100}%
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="flex items-center justify-between p-4 border rounded-lg">
               <div className="flex items-center gap-3">
-                <Badge className={getDecisionColor(result.decision?.decision)}>
-                  {result.decision?.decision?.toUpperCase()}
+                <Badge className={getDecisionColor(result.decision?.decision ?? "")}>
+                  {result.decision?.decision?.toUpperCase() ?? "N/A"}
                 </Badge>
-                {result.decision?.amount > 0 && (
+                {result.decision?.amount && result.decision.amount > 0 && (
                   <div className="flex items-center gap-1 text-lg font-semibold text-green-600">
-                    <DollarSign className="w-4 h-4" />₹{result.decision.amount.toLocaleString()}
+                    <DollarSign className="w-4 h-4" />
+                    ₹{result.decision.amount.toLocaleString()}
                   </div>
                 )}
               </div>
@@ -201,7 +224,7 @@ export function QueryProcessor({ uploadedDocs, onDecisionMade }: QueryProcessorP
                   <div>
                     <div className="text-xs text-gray-500">Age & Gender</div>
                     <div className="font-medium">
-                      {result.extractedInfo?.age}, {result.extractedInfo?.gender}
+                      {result.extractedInfo?.age ?? "N/A"}, {result.extractedInfo?.gender ?? "N/A"}
                     </div>
                   </div>
                 </div>
@@ -209,21 +232,21 @@ export function QueryProcessor({ uploadedDocs, onDecisionMade }: QueryProcessorP
                   <FileText className="w-4 h-4 text-purple-500" />
                   <div>
                     <div className="text-xs text-gray-500">Procedure</div>
-                    <div className="font-medium">{result.extractedInfo?.procedure}</div>
+                    <div className="font-medium">{result.extractedInfo?.procedure ?? "N/A"}</div>
                   </div>
                 </div>
                 <div className="flex items-center gap-2 p-2 bg-gray-50 rounded">
                   <MapPin className="w-4 h-4 text-green-500" />
                   <div>
                     <div className="text-xs text-gray-500">Location</div>
-                    <div className="font-medium">{result.extractedInfo?.location}</div>
+                    <div className="font-medium">{result.extractedInfo?.location ?? "N/A"}</div>
                   </div>
                 </div>
                 <div className="flex items-center gap-2 p-2 bg-gray-50 rounded">
                   <Calendar className="w-4 h-4 text-orange-500" />
                   <div>
                     <div className="text-xs text-gray-500">Policy Age</div>
-                    <div className="font-medium">{result.extractedInfo?.policyAge}</div>
+                    <div className="font-medium">{result.extractedInfo?.policyAge ?? "N/A"}</div>
                   </div>
                 </div>
               </div>
@@ -234,7 +257,7 @@ export function QueryProcessor({ uploadedDocs, onDecisionMade }: QueryProcessorP
             <div>
               <h4 className="font-semibold mb-2">Justification</h4>
               <p className="text-gray-700 bg-gray-50 p-3 rounded-lg">
-                {result.decision?.justification}
+                {result.decision?.justification ?? "No justification provided."}
               </p>
             </div>
 
@@ -242,7 +265,7 @@ export function QueryProcessor({ uploadedDocs, onDecisionMade }: QueryProcessorP
               <h4 className="font-semibold mb-3">Relevant Clauses</h4>
               {Array.isArray(result.relevantClauses) ? (
                 <div className="space-y-3">
-                  {result.relevantClauses.map((clause: any, index: number) => (
+                  {result.relevantClauses.map((clause: Clause, index: number) => (
                     <div key={index} className="border rounded-lg p-3">
                       <div className="flex items-center justify-between mb-2">
                         <div className="flex items-center gap-2">
@@ -262,7 +285,7 @@ export function QueryProcessor({ uploadedDocs, onDecisionMade }: QueryProcessorP
                 </div>
               ) : (
                 <div className="text-gray-500 bg-gray-50 p-3 rounded-lg">
-                  <p>{result.relevantClauses || "No structured clauses returned."}</p>
+                  <p>{result.relevantClauses ?? "No structured clauses returned."}</p>
                 </div>
               )}
             </div>

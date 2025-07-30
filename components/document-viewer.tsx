@@ -16,15 +16,16 @@ export function DocumentViewer({ uploadedDocs }: DocumentViewerProps) {
   const [selectedDoc, setSelectedDoc] = useState<any>(null)
   const [searchTerm, setSearchTerm] = useState("")
   const [highlightedText, setHighlightedText] = useState("")
-const handleSelectDocument = async (docId: number) => {
-  try {
-    const res = await fetch(`http://localhost:5000/documents/${docId}`)
-    const fullDoc = await res.json()
-    setSelectedDoc(fullDoc)
-  } catch (error) {
-    console.error("Error fetching document:", error)
+
+  const handleSelectDocument = async (docId: number) => {
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/documents/${docId}`)
+      const fullDoc = await res.json()
+      setSelectedDoc(fullDoc)
+    } catch (error) {
+      console.error("Error fetching document:", error)
+    }
   }
-}
 
   const highlightText = (text: string, highlight: string) => {
     if (!highlight) return text
@@ -88,7 +89,6 @@ const handleSelectDocument = async (docId: number) => {
                     selectedDoc?.id === doc.id ? "border-blue-500 bg-blue-50" : "hover:bg-gray-50"
                   }`}
                   onClick={() => handleSelectDocument(doc.id)}
-
                 >
                   <div className="flex items-center gap-2 mb-1">
                     <FileText className="w-4 h-4 text-gray-500" />
@@ -128,7 +128,7 @@ const handleSelectDocument = async (docId: number) => {
                   </div>
                 </div>
                 <CardDescription>
-                  Uploaded: {new Date(selectedDoc.uploadedAt).toLocaleString()} •{selectedDoc.metadata.pages} pages •
+                  Uploaded: {new Date(selectedDoc.uploadedAt).toLocaleString()} • {selectedDoc.metadata.pages} pages •
                   Language: {selectedDoc.metadata.language.toUpperCase()}
                 </CardDescription>
               </CardHeader>
