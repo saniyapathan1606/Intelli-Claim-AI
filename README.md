@@ -1,13 +1,12 @@
-
-### ✅ `README.md` (copy-paste this in your root folder using VS Code)
-
 # 🧠 Intelli-Claim AI — Health Insurance Claim Decision System
 
 Intelli-Claim AI is an intelligent health insurance claim assessment system powered by LLMs (Gemini). It evaluates user queries (like procedures, age, policy details) against the policy document to determine whether the claim is **Approved** or **Rejected**, along with a detailed justification, relevant clauses, and confidence score.
 
+---
 
 ## 📁 Project Structure
 
+```
 .
 ├── backend/            # Flask-based backend with Gemini integration
 │   ├── app.py
@@ -23,22 +22,26 @@ Intelli-Claim AI is an intelligent health insurance claim assessment system powe
 │
 ├── README.md
 └── .gitignore
+```
 
+---
 
 ## ⚙️ Backend — API Server (Flask)
 
 ### 🔗 **Main API Endpoint**
-```
 
+```
 POST /api/query
 Content-Type: application/json
- 
+```
+
 ### 📤 Sample cURL Request
+
 ```bash
 curl -X POST http://localhost:5000/api/query \
      -H "Content-Type: application/json" \
      -d '{"query": "46-year-old male, knee surgery in Pune, 3-month-old insurance policy"}'
-````
+```
 
 ### 📥 Sample Response
 
@@ -68,7 +71,9 @@ curl -X POST http://localhost:5000/api/query \
     }
   ]
 }
- 
+```
+
+---
 
 ## 🚀 Run Locally
 
@@ -82,7 +87,7 @@ python app.py
 
 ### 🌐 Frontend
 
- 
+*(Add your frontend instructions here)*
 
 ---
 
@@ -103,29 +108,27 @@ GOOGLE_API_KEY=your_gemini_api_key_here
 * SQLite
 * SQLAlchemy
 
- 
+---
 
-## 📦 Hosting Plan
+## 🛆 Hosting Plan
 
 * **Backend**: [Render](https://render.com/)
 * **Frontend**: [Vercel](https://vercel.com/) *(planned)*
- 
 
-## 🧾 Submission Guidelines
+---
+
+## 📋 Submission Guidelines
 
 * ✅ API accepts `POST` requests in cURL format
 * ✅ Response is in JSON with decision, clauses, justification
 * ✅ Clean and modular code
 * ✅ Updated `requirements.txt` in `backend/`
 
- 
+---
 
 ## 👤 Author
 
-**Saniya Pathan**
-**Srushti Lakare**
+**Saniya Pathan** and **Srushti Lakare**
 
 > Final Year Students | HealthTech AI Enthusiasts
 
- 
- 
