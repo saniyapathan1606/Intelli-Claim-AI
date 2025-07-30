@@ -8,17 +8,26 @@ from models.clause_model import Clause
 
 # 🔐 Configure Gemini
 genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
-model = genai.GenerativeModel("gemini-1.5-flash")
+model = genai.GenerativeModel("gemini-1.5-flash")  # You may switch to gemini-1.5-pro if needed
 
-# ✅ Get latest policy text from DB
+# ✅ Get trimmed policy text for faster LLM processing
 def get_all_policy_text():
     document = Document.query.order_by(Document.created_at.desc()).first()
-    return document.extracted_text if document and document.extracted_text else "No extracted policy text found."
+    if not document or not document.extracted_text:
+        return "No extracted policy text found."
+
+    raw_text = document.extracted_text
+    important_sections = []
+    for section_title in ["SECTION B", "Waiting Period", "Coverage", "Exclusions"]:
+        match = re.search(rf"{section_title}.*?(?=SECTION|\Z)", raw_text, re.DOTALL | re.IGNORECASE)
+        if match:
+            important_sections.append(match.group().strip())
+
+    return "\n\n".join(important_sections) if important_sections else raw_text
 
 
 # ✅ Parse Gemini's response into structured format
 def parse_response(response_text):
-    # --- Extract Raw Data ---
     decision_match = re.search(r"\*\*Claim:\*\*\s*(APPROVED|REJECTED)", response_text, re.IGNORECASE)
     decision = decision_match.group(1).capitalize() if decision_match else "Unknown"
 
@@ -28,9 +37,9 @@ def parse_response(response_text):
     clauses_match = re.search(r"\*\*Relevant Clauses:\*\*(.+?)(?=\*\*|$)", response_text, re.DOTALL)
     clause_lines = []
     if clauses_match:
-        clause_lines = [line.strip("*•- ").strip() for line in clauses_match.group(1).strip().splitlines() if line.strip()]
+        clause_lines = [line.strip("*\u2022- ").strip() for line in clauses_match.group(1).strip().splitlines() if line.strip()]
 
-    amount_match = re.search(r"\*\*Estimated Amount:\*\*\s*\$?([\d,\.]+)", response_text)
+    amount_match = re.search(r"\*\*Estimated Amount:\*\*\s*\u20b9?([\d,.]+)", response_text)
     amount = float(amount_match.group(1).replace(",", "")) if amount_match else 0.0
 
     confidence_match = re.search(r"\*\*Confidence:\*\*\s*(\w+)", response_text)
@@ -38,23 +47,19 @@ def parse_response(response_text):
     confidence_map = {"Low": 0.4, "Medium": 0.6, "High": 0.95}
     confidence = confidence_map.get(confidence_str, 0.6)
 
-    # --- Structured Clause Matching ---
     structured_clauses = match_clauses_to_db(clause_lines)
-
-    # --- 🎯 Human-Readable Justification ---
     justification = f"""
 Decision: The claim is **{decision}**.
 
 Reasoning: {reason_text}
 
-Clause Analysis: {"Relevant clauses were identified and analyzed." if clause_lines else "No relevant clauses were found in the policy document."}
+Clause Analysis: {"Relevant clauses were identified and analyzed." if clause_lines else "No relevant clauses were found."}
 
 Conclusion: Based on the above reasoning and policy wording, the claim has been {decision.lower()} with a confidence level of {confidence_str}.
 
 Estimated Payout: ₹{int(amount):,} (if applicable)
 """.strip()
 
-    # --- Extracted Info (optional enhancement) ---
     extracted_info = extract_structured_info(response_text)
 
     return {
@@ -69,47 +74,9 @@ Estimated Payout: ₹{int(amount):,} (if applicable)
         "relevantClauses": structured_clauses
     }
 
-    decision_match = re.search(r"\*\*Claim: (APPROVED|REJECTED)\*\*", response_text, re.IGNORECASE)
-    decision = decision_match.group(1).lower() if decision_match else "unknown"
 
-    justification = response_text.strip()
+# 🧠 Extract info like Age, Gender, Procedure, Location
 
-    # 🔎 Extract relevant clauses
-    relevant_clauses_match = re.search(r"\*\*Relevant Clauses:\*\*(.*?)(?:\n\n|\*\*|$)", response_text, re.DOTALL | re.IGNORECASE)
-    text_clauses = []
-    if relevant_clauses_match:
-        clause_text = relevant_clauses_match.group(1).strip()
-        text_clauses = [line.strip("*•- ").strip() for line in clause_text.splitlines() if line.strip()]
-    
-    structured_clauses = match_clauses_to_db(text_clauses)
-
-    # 💰 Estimated Amount
-    amount_match = re.search(r"\*\*Estimated Amount:\*\*\s*\$?([\d,\.]+)", response_text)
-    amount = float(amount_match.group(1).replace(",", "")) if amount_match else 0.0
-
-    # 🎯 Confidence
-    confidence_match = re.search(r"\*\*Confidence:\*\*\s*(\w+)", response_text)
-    confidence_str = confidence_match.group(1).lower() if confidence_match else "medium"
-    confidence_map = {"low": 0.4, "medium": 0.6, "high": 0.75}
-    confidence = confidence_map.get(confidence_str, 0.6)
-
-    # 🧠 Extracted Info
-    extracted_info = extract_structured_info(response_text)
-
-    return {
-        "decision": {
-            "decision": decision,
-            "justification": justification,
-            "confidence": confidence,
-            "amount": amount,
-        },
-        "timestamp": datetime.now().isoformat(),
-        "extractedInfo": extracted_info,
-        "relevantClauses": structured_clauses
-    }
-
-
-# 🧠 Extract Age, Gender, Procedure, etc. from Gemini response
 def extract_structured_info(text):
     def extract(pattern):
         match = re.search(pattern, text, re.IGNORECASE)
@@ -163,27 +130,28 @@ def match_clauses_to_db(text_clauses):
 
 # 🚀 Generate Decision Using Gemini
 def generate_decision(query):
+    policy_text = get_all_policy_text()
     prompt = f"""
-Given this insurance policy:
-<POLICY_TEXT>
-{get_all_policy_text()}
-</POLICY_TEXT>
-
-And this user query:
-{query}
-
-Please determine whether the claim is **APPROVED** or **REJECTED**. Also provide:
+You are a health insurance expert. Based on the following policy and user query, determine:
 
 **Claim:** APPROVED or REJECTED  
-**Reason:** Brief justification  
-**Relevant Clauses:** List relevant clauses  
+**Reason:** Brief reasoning  
+**Relevant Clauses:** Mention clause references  
 **Confidence:** Low / Medium / High  
-**Estimated Amount:** $XXXX  
+**Estimated Amount:** ₹XXXX  
 **Age:**  
 **Gender:**  
 **Procedure:**  
 **Location:**  
 **Policy Age:**  
+
+<Policy>
+{policy_text}
+</Policy>
+
+<User Query>
+{query}
+</User Query>
 """
 
     response = model.generate_content(prompt)
