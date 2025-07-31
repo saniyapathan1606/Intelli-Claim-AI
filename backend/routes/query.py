@@ -3,38 +3,37 @@ from services.llm import generate_decision
 import os
 import logging
 import google.generativeai as genai
-import requests
 from PyPDF2 import PdfReader
-from io import BytesIO
 
 query_bp = Blueprint("query", __name__)
 
-# Logging setup
+# ──────────────────────────────────────────────
+# 🔐 Logging and Config
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Load keys from environment
 API_KEY = os.getenv("HACKRX_API_KEY")
-genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
+GOOGLE_KEY = os.getenv("GOOGLE_API_KEY")
+
+genai.configure(api_key=GOOGLE_KEY)
 model = genai.GenerativeModel("gemini-1.5-flash")
 
 # ──────────────────────────────────────────────
-# 📄 Extract PDF Text from URL
-def extract_text_from_pdf_url(url):
+# 📄 Load policy text from local file
+def load_policy_from_file():
     try:
-        response = requests.get(url)
-        response.raise_for_status()
-        pdf = PdfReader(BytesIO(response.content))
-        text = ""
-        for page in pdf.pages:
-            text += page.extract_text() or ""
-        return text.strip()
+        with open("policy.pdf", "rb") as f:
+            pdf = PdfReader(f)
+            text = ""
+            for page in pdf.pages:
+                text += page.extract_text() or ""
+            return text.strip()
     except Exception as e:
-        logger.error(f"Error extracting PDF: {e}")
+        logger.error(f"Error loading local policy.pdf: {e}")
         return ""
 
 # ──────────────────────────────────────────────
-# 🎯 Manual Query Endpoint (Optional)
+# 🎯 Manual testing endpoint (Optional)
 @query_bp.route("/query", methods=["POST"])
 def process_query():
     try:
@@ -55,29 +54,28 @@ def process_query():
 @query_bp.route("/hackrx/run", methods=["POST"])
 def hackrx_run():
     try:
-        # Auth check
+        # 🔐 Validate API key
         auth_header = request.headers.get("Authorization", "")
         if not auth_header.startswith("Bearer ") or auth_header.split(" ")[1] != API_KEY:
             return jsonify({"error": "Unauthorized. Invalid or missing API key."}), 401
 
-        # Parse input
+        # 📥 Parse request
         data = request.get_json()
-        doc_url = data.get("documents")
         questions = data.get("questions", [])
 
-        if not doc_url or not questions:
-            return jsonify({"error": "Missing 'documents' URL or 'questions' list."}), 400
+        if not questions:
+            return jsonify({"error": "Missing 'questions' list."}), 400
 
-        # Extract policy text
-        policy_text = extract_text_from_pdf_url(doc_url)
+        # 📄 Load static policy document
+        policy_text = load_policy_from_file()
         if not policy_text:
-            return jsonify({"error": "Could not extract text from provided PDF."}), 500
+            return jsonify({"error": "Failed to load policy text from local file."}), 500
 
-        # Generate answers
+        # 🧠 Generate answers
         answers = []
         for question in questions:
             prompt = f"""
-You are a health insurance policy analyst. Based on the policy document below, answer the user's question.
+You are a health insurance expert. Based on the policy text below, answer the user's question.
 
 <Policy>
 {policy_text}
@@ -87,7 +85,7 @@ You are a health insurance policy analyst. Based on the policy document below, a
 {question}
 </Question>
 
-Provide your answer in 1-2 sentences. Be clear and direct. Do not add disclaimers.
+Provide a concise 1-2 line answer. Avoid generic disclaimers.
 """
             try:
                 response = model.generate_content(prompt)
