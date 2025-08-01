@@ -24,6 +24,7 @@ model = genai.GenerativeModel("gemini-1.5-flash")
 # PDF Extraction with Fallback
 def extract_text_from_pdf_url(url):
     try:
+        logger.info("Trying to extract PDF from URL...")
         response = requests.get(url, timeout=10)
         response.raise_for_status()
 
@@ -34,32 +35,49 @@ def extract_text_from_pdf_url(url):
             if page_text:
                 text += page_text + "\n"
 
-        if text.strip() == "":
-            raise ValueError("Empty text extracted.")
-
+        if not text.strip():
+            raise ValueError("Extracted text is empty.")
+        
         logger.info("PDF text extracted successfully from URL.")
         return text.strip()
 
     except Exception as e:
         logger.error(f"Error extracting PDF from URL: {e}")
-        logger.warning("Falling back to local cached PDF.")
+        logger.warning("Falling back to local policy file...")
         return load_fallback_policy_text()
 
 
 def load_fallback_policy_text():
     try:
-        fallback_path = os.path.join("assets", "fallback_policy.pdf")
-        with open(fallback_path, "rb") as f:
-            pdf = PdfReader(f)
-            text = ""
-            for page in pdf.pages:
-                page_text = page.extract_text()
-                if page_text:
-                    text += page_text + "\n"
-            return text.strip()
+        fallback_pdf_path = os.path.join("assets", "fallback_policy.pdf")
+        fallback_txt_path = os.path.join("assets", "fallback_policy.txt")
+
+        # Try .pdf first
+        if os.path.exists(fallback_pdf_path):
+            with open(fallback_pdf_path, "rb") as f:
+                pdf = PdfReader(f)
+                text = ""
+                for page in pdf.pages:
+                    page_text = page.extract_text()
+                    if page_text:
+                        text += page_text + "\n"
+                logger.info("Loaded fallback PDF successfully.")
+                return text.strip()
+
+        # Then try .txt fallback
+        elif os.path.exists(fallback_txt_path):
+            with open(fallback_txt_path, "r", encoding="utf-8") as f:
+                text = f.read()
+                logger.info("Loaded fallback TXT successfully.")
+                return text.strip()
+
+        else:
+            raise FileNotFoundError("No fallback file found.")
+
     except Exception as e:
-        logger.error(f"Failed to load fallback policy PDF: {e}")
-        return "No policy data available."
+        logger.error(f"Fallback text loading failed: {e}")
+        return ""  # important: return empty string, not a message
+
 
 # ───────────────────────────────
 # 🎯 Manual Query Endpoint
@@ -81,6 +99,7 @@ def process_query():
         logger.exception("Error in /query")
         return jsonify({"error": "Internal server error", "message": str(e)}), 500
 
+
 # ───────────────────────────────
 # ✅ HackRx-Compliant Endpoint
 @query_bp.route("/hackrx/run", methods=["POST"])
@@ -101,7 +120,7 @@ def hackrx_run():
 
         # Extract policy text
         policy_text = extract_text_from_pdf_url(doc_url)
-        if not policy_text or policy_text == "No policy data available.":
+        if not policy_text:
             return jsonify({"error": "Could not extract text from provided PDF."}), 500
 
         # Generate answers
